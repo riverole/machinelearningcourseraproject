@@ -1,0 +1,51 @@
+### Summary
+
+This study is about determining the quality of an exercise measuring with sensors attached to the body. The idea is to understand if we can determine the quality of an exerrcise, giving certain parameters measured by these sensors, so then we can give real-time feedback to the person indicating that the exercise has not been executed correctly.
+The dataset is a collection of data from 6 subjects, doing weight lifting exercises. These subjects, will alternate between "bad" and "good" exercises, that will be classified as a letter (A for correct) and indicated in the variable classe.
+The dataset has been shared by http://groupware.les.inf.puc-rio.br/har.
+As we will see in our analysis, we are able to build a really accurate predictor (99.6%) using the random forest algorithm. Instead of using directly the training set as a only training set, we'll split it in training and testing data (and leave the testing data for validation).
+
+
+### Exploratory data analysis
+
+First of all we have to load the data.
+
+```{r}
+dataset <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+validation <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+```
+
+Now, we have to actually eliminate columns that will not add any value to the model. To do that, we look at the columns that have only NA values, the timestamp columns, the X column, and the columns that have other values, but that in the "test" set, have only NAs (as these won't be of any use to predict). We'll subset then our dataset.
+
+```{r}
+dataset <- subset(dataset, select = -c(X, raw_timestamp_part_1,raw_timestamp_part_2,cvtd_timestamp,stddev_pitch_forearm,var_pitch_forearm, avg_yaw_forearm,stddev_yaw_forearm,var_yaw_forearm,var_accel_forearm,avg_roll_forearm, stddev_roll_forearm,var_roll_forearm,avg_pitch_forearm, amplitude_roll_forearm, amplitude_pitch_forearm, amplitude_yaw_forearm, max_roll_forearm, max_picth_forearm, max_yaw_forearm, min_roll_forearm, min_pitch_forearm, min_yaw_forearm, kurtosis_yaw_forearm, skewness_roll_forearm, skewness_pitch_forearm, skewness_yaw_forearm, kurtosis_roll_forearm, kurtosis_picth_forearm, var_yaw_dumbbell, avg_pitch_dumbbell, stddev_pitch_dumbbell, var_pitch_dumbbell, avg_yaw_dumbbell, stddev_yaw_dumbbell, var_accel_dumbbell, avg_roll_dumbbell, stddev_roll_dumbbell, var_roll_dumbbell, min_yaw_dumbbell, amplitude_roll_dumbbell, amplitude_pitch_dumbbell, amplitude_yaw_dumbbell, max_roll_dumbbell, max_picth_dumbbell, max_yaw_dumbbell, min_roll_dumbbell, min_pitch_dumbbell, kurtosis_yaw_dumbbell, skewness_roll_dumbbell, skewness_pitch_dumbbell, skewness_yaw_dumbbell, kurtosis_roll_dumbbell, kurtosis_picth_dumbbell, min_yaw_arm, amplitude_roll_arm, amplitude_pitch_arm, amplitude_yaw_arm, skewness_yaw_arm, max_roll_arm, max_picth_arm, max_yaw_arm, min_roll_arm,   min_pitch_arm, kurtosis_roll_arm, kurtosis_picth_arm, kurtosis_yaw_arm, skewness_roll_arm, skewness_pitch_arm, stddev_yaw_arm, var_yaw_arm, stddev_roll_arm, var_roll_arm,   avg_pitch_arm,  stddev_pitch_arm, var_pitch_arm,  avg_yaw_arm, var_accel_arm,  avg_roll_arm, avg_yaw_belt, stddev_yaw_belt, var_yaw_belt , avg_roll_belt,  stddev_roll_belt, var_roll_belt,  avg_pitch_belt, stddev_pitch_belt, var_pitch_belt, min_yaw_belt,   amplitude_roll_belt, amplitude_pitch_belt, amplitude_yaw_belt, var_total_accel_belt, skewness_yaw_belt, max_roll_belt,  max_picth_belt, max_yaw_belt,   min_roll_belt,  min_pitch_belt, kurtosis_roll_belt, kurtosis_picth_belt, kurtosis_yaw_belt, skewness_roll_belt, skewness_roll_belt.1))
+```
+
+Even though they're called training and testing, the testing data only has 20 observations, so we will just use it for validation at the end of the study, so we will first split the "training" dataset into a real training dataset and a test dataset. We will use 80% for training and 20% for testing. 
+
+```{r}
+library(caret)
+set.seed(998)
+inTraining <- createDataPartition(dataset$classe, p = .80, list = FALSE)
+training <- dataset[ inTraining,]
+testing  <- dataset[-inTraining,]
+```
+
+First of all, we will train a random forest without cross-validation with our training dataset, to see how it performs. We will use random forest as in this case we don't necessarily want to interpret the results, but we want to actually build that model that will be used in the training gadgets to tell you feedback in real time, so we're not terribly worried about interpretability. Also, RF will be a good choice, as it's able to handle irrelevant features and to determine the relation between features. This is important in this case, as we're not domain experts in the movement sensor detection and we cannot manually remove features that may not affect, so we will let RF to handle it. The drawback of random forests here is that sometimes overfits, for the training set, and then the test set is not that accurate.
+
+```{r}
+rfFit1 <- train(classe ~ ., data = training,
+                 method = "rf",
+                 verbose = FALSE)
+rfFit1
+```
+
+As we see, the accuracy that we obtain is 99.6% with the training set, which is indeed very good.Now, we can predict the test set that we created, to see if we overfitted the training set, or it is indeed a good predictor.
+
+```{r}
+predictionstest <- predict(rfFit1, newdata = testing)
+confusionMatrix(predictionstest, testing$classe)
+```
+
+As we see from the confusionMatrix, we actually have a better accuracy (99.7%) for the testing data, so we can conclude that our model is actually very accurate, and it doesn't seem to be overfitting.
+I could have done cross validation with the traincontrol function, but as the accuracy was good enough, and I didn't have enough power computation and time to run it, I just did the validation through splitting the training data and the test data.
